@@ -72,7 +72,7 @@ txi.rsem <- tximport(files, type = "rsem", txIn = FALSE, txOut = FALSE)
 # head(txi.rsem$counts)
 #countsFromAbundance="scaledTPM" 
 
-#bunny added column names 
+#added column names 
 colnames(txi.rsem$abundance) [1:37] <- as.character(coldata$sample)
 colnames(txi.rsem$counts) [1:37] <- as.character(coldata$sample)
 colnames(txi.rsem$length) [1:37] <- as.character(coldata$sample)
