@@ -20,6 +20,50 @@ library('biomaRt')
 library('edgeR')
 library('tidyverse')
 
+# Function to use AnnotationDbi and biomaRt for gene ids
+convert_ensembl <- function(ensembl_ids) {
+  to_query <- sapply(ensembl_ids, FUN = function(x) {unlist(strsplit(x, "(\\s+)|(?=[[:punct:]])", perl = TRUE))[1]})
+
+  # Use biomaRt for symbols, mapIds for entrez ids and names
+  gene_ids <- biomaRt::getBM(
+    attributes = c('ensembl_gene_id', 'hgnc_symbol', 'entrezgene_id', 'entrezgene_description'),
+    filters = c('ensembl_gene_id'),
+    values = to_query,
+    mart = ensembl,
+    uniqueRows = TRUE)
+
+  entrez <- unlist(AnnotationDbi::mapIds(org.Hs.eg.db, keys=gene_ids$hgnc_symbol, column="ENTREZID", keytype="SYMBOL", multiVals="first"))
+  gene_ids$annotationdbi_entrezid <- NA
+  gene_ids[match(names(entrez), gene_ids$hgnc_symbol), 'annotationdbi_entrezid'] <- entrez
+
+  name <- unlist(AnnotationDbi::mapIds(org.Hs.eg.db, keys=gene_ids$hgnc_symbol, column="GENENAME", keytype="SYMBOL", multiVals="first"))
+  gene_ids$annotationdbi_name <- NA
+
+  gene_ids[match(names(name), gene_ids$hgnc_symbol), 'annotationdbi_name'] <- name
+
+  # Set empty strings to NA
+  gene_ids[gene_ids == ""] <- NA
+
+  # Remove duplicate ensembl ids while keeping correct entrez
+  duplicated_rows <- which(duplicated(gene_ids$ensembl_gene_id) | duplicated(gene_ids$ensembl_gene_id, fromLast=TRUE))
+  correct_rows <- which(gene_ids[duplicated_rows,"entrezgene_id"] == gene_ids[duplicated_rows, "annotationdbi_entrezid"])
+  gene_ids <- gene_ids[-setdiff(duplicated_rows, correct_rows),]
+  gene_ids <- merge(as.data.frame(to_query), gene_ids, by.x = 'to_query', by.y = 'ensembl_gene_id', all.x = TRUE)
+
+  # Remove duplicate hgnc_symbols
+  symbols <- na.omit(gene_ids$hgnc_symbol)
+  duplicated_symbols <- symbols[which(duplicated(symbols))]
+  duplicated_symbol_rows <- gene_ids[which(gene_ids$hgnc_symbol %in% duplicated_symbols),]
+  indices_to_remove <- rownames(duplicated_symbol_rows)[which(is.na(duplicated_symbol_rows$annotationdbi_entrezid))]
+  gene_ids[indices_to_remove, "hgnc_symbol"] <- NA
+
+  # Cleanup
+  stopifnot(nrow(gene_ids) == length(to_query))
+  gene_ids <- gene_ids[,c('to_query', 'hgnc_symbol', 'annotationdbi_entrezid', 'annotationdbi_name')]
+  colnames(gene_ids) <- c('ensembl', 'symbol', 'entrez', 'name')
+  gene_ids[gene_ids==""] <- NA
+  return(gene_ids)
+}
 
 # Set up biomaRt
 ensembl = useMart("ensembl",dataset="hsapiens_gene_ensembl")
@@ -32,7 +76,7 @@ ensembl = useMart("ensembl",dataset="hsapiens_gene_ensembl")
 # tx2gene <- select(txdb, k, "GENEID", "TXNAME")
 
 # SETS THE WORKING DIRECTORY TO THE FOLDER CONTAINING THIS FILE
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # setwd("~/Maggie/melon")
 
 # coldata
@@ -47,22 +91,21 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # file_list <- list.files('~/Maggie/abundances')
 
-coldata <- read.csv('patient_info_final.csv')
-file_list <- sapply(coldata$sample, FUN = function(x) {paste('MF',x,'.tsv', sep = '')})
-files <- file.path(getwd(), 'abundances', file_list)
-
-txi.kallisto.tsv <- tximport(files, type = "kallisto", tx2gene = tx2gene, ignoreAfterBar = TRUE)
+#coldata <- read.csv('patient_info_final.csv')
+#file_list <- sapply(coldata$sample, FUN = function(x) {paste('MF',x,'.tsv', sep = '')})
+#files <- file.path(getwd(), 'abundances', file_list)
 
 ###EdgeR####
 #import RSEM
-edgeR_input <- readDGE(files, columns=c("gene_id","TPM"), group=coldata$x, labels=coldata$sample)
-keep <- filterByExpr(edgeR_input)
-edgeR_input <- edgeR_input[keep,,keep.lib.sizes=FALSE]
-edgeR_input <-calcNormFactors(edgeR_input)
-design <- model.matrix(~coldata$x)
-edgeR_input <- estimateDisp(edgeR_input,design)
-logcpm <- cpm(edgeR_input, log=TRUE)
-plotMDS(logcpm)
+#edgeR_input <- readDGE(files, columns=c("gene_id","TPM"), group=coldata$x, labels=coldata$sample)
+#keep <- filterByExpr(edgeR_input)
+#edgeR_input <- edgeR_input[keep,,keep.lib.sizes=FALSE]
+#edgeR_input <-calcNormFactors(edgeR_input)
+#design <- model.matrix(~coldata$x)
+#edgeR_input <- estimateDisp(edgeR_input,design)
+#logcpm <- cpm(edgeR_input, log=TRUE)
+#logcpm_plot <- plotMDS(logcpm)
+#ggsave("logcpm_plot.pdf", logcpm_plot)
 
 #### Import RSEM ####
 dir <- normalizePath('RSEM_37')
@@ -71,9 +114,9 @@ files <- file.path(dir, paste0('MF', coldata$sample, ".genes.results"))
 # finames(files) <- paste0("sample", 1:6)
 txi.rsem <- tximport(files, type = "rsem", txIn = FALSE, txOut = FALSE)
 # head(txi.rsem$counts)
-#countsFromAbundance="scaledTPM" 
+#countsFromAbundance="scaledTPM"
 
-#added column names 
+#added column names
 colnames(txi.rsem$abundance) [1:37] <- as.character(coldata$sample)
 colnames(txi.rsem$counts) [1:37] <- as.character(coldata$sample)
 colnames(txi.rsem$length) [1:37] <- as.character(coldata$sample)
@@ -88,55 +131,9 @@ SAMPLE_GROUP <- 'LSP'
 REFERENCE_GROUP <- 'ESP'
 
 dds_formula = as.formula(paste('~', VARIABLE_OF_INTEREST))
-# dds <- DESeqDataSetFromTximport(txi.kallisto.tsv, colData = coldata, design = ~ x)
-# dds <- DESeqDataSetFromTximport(txi.kallisto.tsv, colData = coldata, design = dds_formula)
 dds <- DESeqDataSetFromTximport(txi.rsem, colData = coldata, design = dds_formula)
 dds <- DESeq(dds)
 
-# Function to use AnnotationDbi and biomaRt for gene ids
-convert_ensembl <- function(ensembl_ids) {
-  to_query <- sapply(ensembl_ids, FUN = function(x) {unlist(strsplit(x, "(\\s+)|(?=[[:punct:]])", perl = TRUE))[1]})
-  
-  # Use biomaRt for symbols, mapIds for entrez ids and names
-  gene_ids <- biomaRt::getBM(
-    attributes = c('ensembl_gene_id', 'hgnc_symbol', 'entrezgene_id', 'entrezgene_description'),
-    filters = c('ensembl_gene_id'),
-    values = to_query,
-    mart = ensembl,
-    uniqueRows = TRUE)
-  
-  entrez <- unlist(AnnotationDbi::mapIds(org.Hs.eg.db, keys=gene_ids$hgnc_symbol, column="ENTREZID", keytype="SYMBOL", multiVals="first"))
-  gene_ids$annotationdbi_entrezid <- NA
-  gene_ids[match(names(entrez), gene_ids$hgnc_symbol), 'annotationdbi_entrezid'] <- entrez
-  
-  name <- unlist(AnnotationDbi::mapIds(org.Hs.eg.db, keys=gene_ids$hgnc_symbol, column="GENENAME", keytype="SYMBOL", multiVals="first"))
-  gene_ids$annotationdbi_name <- NA
-  
-  gene_ids[match(names(name), gene_ids$hgnc_symbol), 'annotationdbi_name'] <- name
-  
-  # Set empty strings to NA
-  gene_ids[gene_ids == ""] <- NA
-  
-  # Remove duplicate ensembl ids while keeping correct entrez
-  duplicated_rows <- which(duplicated(gene_ids$ensembl_gene_id) | duplicated(gene_ids$ensembl_gene_id, fromLast=TRUE))
-  correct_rows <- which(gene_ids[duplicated_rows,"entrezgene_id"] == gene_ids[duplicated_rows, "annotationdbi_entrezid"])
-  gene_ids <- gene_ids[-setdiff(duplicated_rows, correct_rows),]   
-  gene_ids <- merge(as.data.frame(to_query), gene_ids, by.x = 'to_query', by.y = 'ensembl_gene_id', all.x = TRUE)
-  
-  # Remove duplicate hgnc_symbols
-  symbols <- na.omit(gene_ids$hgnc_symbol)
-  duplicated_symbols <- symbols[which(duplicated(symbols))]
-  duplicated_symbol_rows <- gene_ids[which(gene_ids$hgnc_symbol %in% duplicated_symbols),]
-  indices_to_remove <- rownames(duplicated_symbol_rows)[which(is.na(duplicated_symbol_rows$annotationdbi_entrezid))]
-  gene_ids[indices_to_remove, "hgnc_symbol"] <- NA
-  
-  # Cleanup
-  stopifnot(nrow(gene_ids) == length(to_query))
-  gene_ids <- gene_ids[,c('to_query', 'hgnc_symbol', 'annotationdbi_entrezid', 'annotationdbi_name')]
-  colnames(gene_ids) <- c('ensembl', 'symbol', 'entrez', 'name')
-  gene_ids[gene_ids==""] <- NA
-  return(gene_ids)
-}
 gene_ids <- convert_ensembl(rownames(counts(dds)))
 
 
@@ -231,23 +228,23 @@ vsd.go.cc.esg.down <- fast.esset.grp(vsd.go.cc.p$less, go.cc.gs, up = F)
 ####
 
 vsd.kegg.sigmet.esg.up <- fast.esset.grp(vsd.kegg.sigmet.p$greater, kegg.sigmet.gs, up = T)
-#View(vsd.kegg.sigmet.p$greater[which(rownames(vsd.kegg.sigmet.p$greater) %in% vsd.kegg.sigmet.esg.up$essentialSets),]) 
+#View(vsd.kegg.sigmet.p$greater[which(rownames(vsd.kegg.sigmet.p$greater) %in% vsd.kegg.sigmet.esg.up$essentialSets),])
 
 #write.csv(vsd.kegg.sigmet.p$greater[which(rownames(vsd.kegg.sigmet.p$greater) %in% vsd.kegg.sigmet.esg.up$essentialSets),],"DESeq2_ESP_TMR_KEGG_SIGMET.csv", row.names = TRUE)
 
 
 #vsd.kegg.sigmet.p$greater
-#head(kegg.sigmet.gs$hsa04660) 
+#head(kegg.sigmet.gs$hsa04660)
 
 #View(vst_counts[which(rownames(vst_counts) %in% go.bp.gs[[rownames(vsd.go.bp.p$greater[which(rownames(vsd.go.bp.p$greater) %in% vsd.go.bp.esg.up$essentialSets),])[2]]]),])
 
 
 vsd.kegg.sigmet.esg.down <- fast.esset.grp(vsd.kegg.sigmet.p$less, kegg.sigmet.gs, up = F)
-#View(vsd.kegg.sigmet.p$less[which(rownames(vsd.kegg.sigmet.p$less) %in% vsd.kegg.sigmet.esg.down$essentialSets),]) 
+#View(vsd.kegg.sigmet.p$less[which(rownames(vsd.kegg.sigmet.p$less) %in% vsd.kegg.sigmet.esg.down$essentialSets),])
 vsd.kegg.dise.esg.up <- fast.esset.grp(vsd.kegg.dise.p$greater, kegg.dise.gs, up = T)
-#View(vsd.kegg.dise.p$greater[which(rownames(vsd.kegg.dise.p$greater) %in% vsd.kegg.dise.esg.up$essentialSets),]) 
+#View(vsd.kegg.dise.p$greater[which(rownames(vsd.kegg.dise.p$greater) %in% vsd.kegg.dise.esg.up$essentialSets),])
 vsd.kegg.dise.esg.down <- fast.esset.grp(vsd.kegg.dise.p$less, kegg.dise.gs, up = F)
-#View(vsd.kegg.dise.p$less[which(rownames(vsd.kegg.dise.p$less) %in% vsd.kegg.dise.esg.down$essentialSets),]) 
+#View(vsd.kegg.dise.p$less[which(rownames(vsd.kegg.dise.p$less) %in% vsd.kegg.dise.esg.down$essentialSets),])
 
 
 vsd.go.bp.esg.up <- fast.esset.grp(vsd.go.bp.p$greater, go.bp.gs, up = T)
@@ -289,7 +286,7 @@ go.stat.heatmap <- pheatmap(go.stat.heatmap.df,
                             cluster_rows = FALSE,
                             cluster_cols = TRUE,
                             color = colorRampPalette(c("red", "black", "green"),space = 'rgb')(100)
-) 
+)
 
 n.genes <- 25
 
@@ -422,7 +419,7 @@ write.csv(res,"ESP_LSP_short_005.csv", row.names = TRUE)
 
 #view(res[row.names(res) %in% testicular_results, ])
 
-###Clusterprofiler### 
+###Clusterprofiler###
 
 res_cluster <- as.data.frame(results(dds, contrast = c(VARIABLE_OF_INTEREST, 'TUM', 'ESP')))
 
@@ -433,59 +430,59 @@ original_gene_list <- res_cluster$log2FoldChange
 # name the vector
 names(original_gene_list) <- gene_ids$ensembl
 
-# omit any NA values 
+# omit any NA values
 gene_list<-na.omit(original_gene_list)
 
 # sort the list in decreasing order (required for clusterProfiler)
 gene_list = sort(gene_list, decreasing = TRUE)
 
 ##BP
-gse <- gseGO(geneList=gene_list, 
-             ont ="BP", 
-             keyType = "ENSEMBL", 
-             nPerm = 10000, 
-             pvalueCutoff = 0.05, 
-             verbose = TRUE, 
-             OrgDb = org.Hs.eg.db, 
+gse <- gseGO(geneList=gene_list,
+             ont ="BP",
+             keyType = "ENSEMBL",
+             nPerm = 10000,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = org.Hs.eg.db,
              pAdjustMethod = "none")
 
 ##MF
-gse <- gseGO(geneList=gene_list, 
-             ont ="MF", 
-             keyType = "ENSEMBL", 
-             nPerm = 10000, 
-             pvalueCutoff = 0.05, 
-             verbose = TRUE, 
-             OrgDb = org.Hs.eg.db, 
+gse <- gseGO(geneList=gene_list,
+             ont ="MF",
+             keyType = "ENSEMBL",
+             nPerm = 10000,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = org.Hs.eg.db,
              pAdjustMethod = "none")
 
 
 ##CC
-gse <- gseGO(geneList=gene_list, 
-             ont ="CC", 
-             keyType = "ENSEMBL", 
-             nPerm = 10000, 
-             pvalueCutoff = 0.05, 
-             verbose = TRUE, 
-             OrgDb = org.Hs.eg.db, 
+gse <- gseGO(geneList=gene_list,
+             ont ="CC",
+             keyType = "ENSEMBL",
+             nPerm = 10000,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = org.Hs.eg.db,
              pAdjustMethod = "none")
 
 
 ##ALL
-gse <- gseGO(geneList=gene_list, 
-             ont ="ALL", 
-             keyType = "ENSEMBL", 
-             nPerm = 10000, 
-             pvalueCutoff = 0.05, 
-             verbose = TRUE, 
-             OrgDb = org.Hs.eg.db, 
+gse <- gseGO(geneList=gene_list,
+             ont ="ALL",
+             keyType = "ENSEMBL",
+             nPerm = 10000,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = org.Hs.eg.db,
              pAdjustMethod = "none")
 
 require(DOSE)
 dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
 emapplot(gse, showCategory = 10)
 
-###KEGG### 
+###KEGG###
 
 # Convert gene IDs for gseKEGG function
 
@@ -495,7 +492,7 @@ kegg_gene_list <- res_cluster$log2FoldChange
 # Name vector with ENTREZ ids
 names(kegg_gene_list) <- gene_ids$entrez
 
-# omit any NA values 
+# omit any NA values
 kegg_gene_list<-na.omit(kegg_gene_list)
 
 # sort the list in decreasing order (required for clusterProfiler)
@@ -526,9 +523,9 @@ for (i in 1:length(labels_to_plot)) {
     }
     print(paste('Generating result and plot object for', sample_level,'versus',reference_level))
     res_temp <- as.data.frame(results(dds, contrast = c(VARIABLE_OF_INTEREST, sample_level, reference_level)))
-   
+
     res_temp <- res_temp[res_temp$log2FoldChange <10,]
-    
+
     #res_temp  %>% filter(res_temp$log2FoldChange > 7)
     deseq_results_list[[paste(sample_level,'_',reference_level,'_res', sep = '')]] <- res_temp
      gene_symbols_for_plot <- mapIds(org.Hs.eg.db,
@@ -537,20 +534,20 @@ for (i in 1:length(labels_to_plot)) {
                                      keytype="ENSEMBL",
                                      multiVals="first")
      please <-sub("^[^_]*_", "", rownames(res_temp))
-     
+
     plot_temp <- EnhancedVolcano(res_temp,
                                  lab =  please,
-                                 selectLab = c("PRSS21", "KIR3DL2"),  
+                                 selectLab = c("PRSS21", "KIR3DL2"),
                                  x = 'log2FoldChange',
                                  y = 'padj',
-                                 pCutoff = 0.05, 
+                                 pCutoff = 0.05,
                                  FCcutoff = 1,
                                  title = paste(sample_level,'versus',reference_level))
     volcano_plot_list[[paste(sample_level,'_',reference_level,'_volcano_plot', sep = '')]] <- plot_temp
   }
 }
 #volcano_plot_list$TUM_ESP_volcano_plot
-#volcano_plot_list$LSP_ESP_volcano_plot  #885, 775 
+#volcano_plot_list$LSP_ESP_volcano_plot  #885, 775
 #volcano_plot_list$TUM_LSP_volcano_plot
 
 
