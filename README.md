@@ -41,3 +41,6 @@ Once the config.yaml file has been generated, the alignment can be run with
 ```
 snakemake -s /path/to/rsem.snakefile --use-conda --configfile config.yaml
 ```
+
+### Maggie's code
+Please put your write up here.
