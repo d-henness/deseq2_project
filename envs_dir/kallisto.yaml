@@ -1,0 +1,10 @@
+channels:
+ - conda-forge
+ - bioconda
+ - defaults
+dependencies:
+ - kallisto=0.45.0
+ - r-sleuth=0.30.0
+ - fastp=0.19.7
+ - numpy
+ - python=3
