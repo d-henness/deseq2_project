@@ -10,7 +10,6 @@ def file_is_fq(filenm):
 def main():
     parser = argparse.ArgumentParser("Make config file for snakemake workflows. Directories containing the string 'tmp' anywhere in their name will automatically be excluded. The user will need to manually match the directories as tumour: normal pairs")
     parser.add_argument('dir_strings', nargs = '+', help = """One or more strings that match the directories containing .fq.gz files. Example: \'python3 /path/to/make_config_2.py RG MF\' will match the directories RG7_1, RG7_PBMC, and MF5_PBMC, but not the directory RG7_1_tmp""")
-    parser.add_argument('-b', '--bed_file', help = "bed_file for this run", required = True)
     parser.add_argument('-r', '--rna', action = 'store_true', help = "rna mode")
     args = parser.parse_args()
 
@@ -70,8 +69,6 @@ def main():
 #                    merge_lib_string = "\"{:}{:}_{:}\", ".format(merge_lib_string, i, j)
 #                merge_lib_string = "{:}]".format(merge_lib_string[:-2])
 #                merge_libs.append(merge_lib_string)
-
-    print(f"alt_bed:  {args.bed_file}")
 
     if args.rna:
         print("rna_libraries:")
