@@ -27,7 +27,7 @@
 ### Aligning and Quantifying Paired-End RNA-seq Data
 A prebuilt bowtie2 index will be needed. Edit the 
 ```
-"rsem_index": "/path/to/rsem/index/"
+"bowtie_index": "/path/to/bowtie/index/"
 ```
 line in ref.yaml to include the path to the index. The scripts_dir/make_config_3.py script can be used to make a config file from the paired end fastq files
 you want to run on for snakemake.  The paired end fastq files for different libraries will need to be in separate directories. For example MF1_1.fq and MF1_2.fq should be in a directory called

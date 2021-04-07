@@ -1,5 +1,5 @@
 # change this as needed
 "illumina_adapter": "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
 
-# path to the rsem index
-"rsem_index": "/path/to/rsem/index/"
+# path to the bowtie index
+"bowtie_index": "/path/to/bowtie/index/"

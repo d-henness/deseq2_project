@@ -20,7 +20,7 @@ rule rsem:
     time_min = lambda wildcards, attempt: attempt * (24 * 60),	# time in minutes
   threads: 4
   params:
-    index = config["rsem_index"],
+    index = config["bowtie_index"],
     out_pre = lambda wildcards: f"rsem/{wildcards.rna_lib}/{wildcards.rna_lib}"
   benchmark:
     "rsem/benchmark/{rna_lib}_rsem.benchmark"
