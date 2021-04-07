@@ -46,10 +46,10 @@ Once completed, the results can be found in the rsem directory.
 ### Differential Expression Analysis
 The code written to perform the differential expression analysis is in the R directory and should be run using the RStudio IDE. 
 The following two(2) dependencies should be available in the same directory containing this "Xiao_MF_DeSeq2.R" script to avoid renaming file paths.   
-(1)  "patient_info_final.cvs" -- a master file that holds information on sample ID (e.g. MF4_2), lesion type (e.g. TMR), disease stage (e.g. IIB)
-(2)  A folder, named "RSEM_37" to hold all 37 .genes.results files. (e.g. "MF4_2.genes.results")
+1. "patient_info_final.cvs" -- a master file that holds information on sample ID (e.g. MF4_2), lesion type (e.g. TMR), disease stage (e.g. IIB)
+2. A folder, named "RSEM_37" to hold all 37 .genes.results files. (e.g. "MF4_2.genes.results")
 
-The variable `SAMPLE_GROUP` designates the comparison group and can hold the value 'TMR', 'LSP' or 'ESP'. Similarly, REFERENCE_GROUP can be either 'ESP' or 'LSP'
-The default code is set up to compare tumor (TMR, sample group) with early stage plaque (ESP, reference group), i.e.  SAMPLE_GROUP <- 'TMR' and REFERENCE_GROUP <- 'ESP'
-To explore LSP (sample) vs ESP (reference), please relabel the variables as: SAMPLE_GROUP <- 'LSP' vs REFERENCE_GROUP <- 'ESP' 
-To explore TMR (sample) vs LSP (reference), please relabel the variables as: SAMPLE_GROUP <- 'TMR' vs REFERENCE_GROUP <- 'LSP'
+The variable `SAMPLE_GROUP` designates the comparison group and can hold the value `'TMR'`, `'LSP'` or `'ESP'`. Similarly, `REFERENCE_GROUP` can be either `'ESP'` or `'LSP'`.
+The default code is set up to compare tumor (`TMR`, sample group) with early stage plaque (`ESP`, reference group), i.e.  `SAMPLE_GROUP <- 'TMR'` and `REFERENCE_GROUP <- 'ESP'`.
+To explore `LSP` (sample) vs `ESP` (reference), please relabel the variables as: `SAMPLE_GROUP <- 'LSP'` vs `REFERENCE_GROUP <- 'ESP'`.
+To explore `TMR` (sample) vs `LSP` (reference), please relabel the variables as: `SAMPLE_GROUP <- 'TMR'` vs `REFERENCE_GROUP <- 'LSP'`.
