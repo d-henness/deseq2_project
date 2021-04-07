@@ -8,9 +8,8 @@ def file_is_fq(filenm):
     return False
 
 def main():
-    parser = argparse.ArgumentParser("Make config file for snakemake workflows. Directories containing the string 'tmp' anywhere in their name will automatically be excluded. The user will need to manually match the directories as tumour: normal pairs")
-    parser.add_argument('dir_strings', nargs = '+', help = """One or more strings that match the directories containing .fq.gz files. Example: \'python3 /path/to/make_config_2.py RG MF\' will match the directories RG7_1, RG7_PBMC, and MF5_PBMC, but not the directory RG7_1_tmp""")
-    parser.add_argument('-r', '--rna', action = 'store_true', help = "rna mode")
+    parser = argparse.ArgumentParser("Make config file for snakemake workflows. Directories containing the string 'tmp' anywhere in their name will automatically be excluded.")
+    parser.add_argument('dir_strings', nargs = '+', help = "One or more strings that match the directories containing .fq.gz files. Example: \'python3 /path/to/make_config_2.py RG MF\' will match the directories RG7_1, RG7_PBMC, and MF5_PBMC, but not the directory RG7_1_tmp")
     args = parser.parse_args()
 
     libs = {}
@@ -70,17 +69,10 @@ def main():
 #                merge_lib_string = "{:}]".format(merge_lib_string[:-2])
 #                merge_libs.append(merge_lib_string)
 
-    if args.rna:
-        print("rna_libraries:")
-    else:
-        print("libraries:")
+    print("rna_libraries:")
     for i, libname in enumerate(libs):
         print(f"  {libname}: {libs[libname]}")
-
-    if args.rna:
-        print('rna_merge_libs:')
-    else:
-        print('merge_libs:')
+    print('rna_merge_libs:')
     for i, libname in enumerate(merge_libs):
         print(f"  {libname}: {merge_libs[libname]}")
 
